@@ -16,6 +16,7 @@ from lantern.server.files import FileRef
 from sqlalchemy import func
 
 from constants import APP_TYPE_BASE, APP_TYPE_DLC, APP_TYPE_UPD, TITLES_DB_FILE
+import db as db_models
 from db import Apps, Files, Media, Titles, app_files, db
 from lantern_server import journal
 
@@ -115,7 +116,7 @@ class OwnfoilLibrary:
 
     def __init__(self, base='/api/lantern'):
         self.base = base.rstrip('/')
-        self.families = frozenset({'library', 'titles', 'changes'})
+        self.families = frozenset({'library', 'titles', 'changes', 'cheats'})
         self._log = journal.OwnfoilChangeLog()
         self._journal = journal.OwnfoilJournal(self._log, self)
         self._listeners = []
@@ -165,7 +166,11 @@ class OwnfoilLibrary:
         return []
 
     def cheats(self):
-        return []
+        from lantern_server import cheats
+        try:
+            return [cheat for cheat, _ in cheats.all_sets()]
+        finally:
+            db.session.rollback()
 
     def file(self, file_id):
         """The file to serve, if it is still the one that was hashed."""
@@ -182,7 +187,32 @@ class OwnfoilLibrary:
         return FileRef(path, size, sha256)
 
     def cheat_file(self, cheat_id):
-        return None
+        from lantern_server import cheats
+        try:
+            return cheats.cheat_file(cheat_id)
+        finally:
+            db.session.rollback()
+
+    def write_cheat(self, *, platform, title_id, build_id, source, note, text, replacing=None):
+        from lantern_server import cheats
+        written = cheats.write(platform=platform, title_id=title_id, build_id=build_id, source=source, note=note,
+                               text=text, replacing=replacing)
+        self._tell(LibraryChange('cheats', platform, title_id))
+        return written
+
+    def delete_cheat(self, cheat_id):
+        from lantern_server import cheats
+        row = db.session.get(db_models.LanternCheat, cheat_id)
+        gone = row is not None
+        found = (row.platform, row.title_id) if gone else None
+        if gone:
+            cheats.delete(cheat_id)
+            self._tell(LibraryChange('cheats', *found))
+        return gone
+
+    def _tell(self, change):
+        for listener in list(self._listeners):
+            listener(change)
 
     def journal(self):
         return self._journal
