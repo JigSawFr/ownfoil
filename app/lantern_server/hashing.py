@@ -38,6 +38,16 @@ def has_index(file):
     return file.sha256 is not None and db.session.get(LanternChunks, file.sha256) is not None
 
 
+_RANK = {'BASE': 0, 'UPDATE': 1, 'DLC': 2}
+
+
+def queue_rank(file):
+    """Where a file stands in the queue of work: bases first, then updates and add-ons, the smallest first,
+    so that a library is usable early while the large files are still being read."""
+    kinds = [_RANK.get((app.app_type or '').upper(), 3) for app in file.apps]
+    return (min(kinds) if kinds else 3, file.size or 0)
+
+
 def is_hashed(file):
     """Whether the row holds a hash for the file as it is recorded now."""
     return (file.sha256 is not None

@@ -351,6 +351,10 @@ def set_services_settings(data):
             if service in settings['services']:
                 settings['services'][service].update(config)
 
+def set_lantern_enabled(enabled):
+    with settings_transaction() as settings:
+        settings['lantern']['enabled'] = bool(enabled)
+
 def set_scheduler_settings(data):
     with settings_transaction() as settings:
         settings['scheduler'].update(data)

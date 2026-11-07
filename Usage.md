@@ -151,6 +151,8 @@ lantern:
   enabled: true
 ```
 
+The **Lantern** page of the settings (`/admin/lantern`) turns it on and off, lists the paired devices and invitations (revoke or make one), answers requests for games, and shows the room the backups take.
+
 What it does:
 
 * **Hashes your files.** Lantern lists a file only once its SHA-256 is known, so every file is read once, in the background (the `Tasks` page shows it, one at a time like verification and compression). A file that changes is hashed again.
