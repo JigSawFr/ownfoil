@@ -23,7 +23,7 @@ dependencies = [
     "flask-sock==0.7.0",
     "flask-sqlalchemy==3.1.1",
     "gunicorn==26.2.0 ; sys_platform != 'win32'",
-    "lantern-protocol[crypto,dnssd,flask] @ git+https://github.com/JigSawFr/lantern-sdk@00262c9c71a3f34234789798a455936fd5284f1b#subdirectory=python",
+    "lantern-protocol[crypto,dnssd,flask] @ git+https://github.com/JigSawFr/lantern-sdk@3c2d26405b6ac96387762dae6265543afdd2a96c#subdirectory=python",
     "nstools==2.0.0b7",
     "nsz==5.0.0",
     "pillow==12.3.0",
