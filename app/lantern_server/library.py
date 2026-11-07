@@ -11,7 +11,7 @@ import threading
 from urllib.parse import quote
 
 from lantern import schema
-from lantern.models import App, AppIncludes, ChunksRef, Mirror
+from lantern.models import App, AppIncludes, ChunksRef, Mirror, Section
 from lantern.server.events import LibraryChange
 from lantern.server.files import FileRef
 from sqlalchemy import func
@@ -27,6 +27,10 @@ logger = logging.getLogger('main')
 PLATFORM = 'switch'
 FORMATS = frozenset({'nsp', 'nsz', 'xci', 'xcz'})
 INCLUDES_MAX = 16  # SPEC.md 6.1
+SHELF_MAX = 30  # apps on a shelf
+# The shelves: (id, title, the types of app on it). Newest first, by when Ownfoil first saw the file.
+SHELVES = (('new', 'Recently added games', ('base',)), ('updates', 'Recent updates', ('update',)),
+           ('dlc', 'Recent add-ons', ('dlc',)))
 MIRRORS_MAX = 8  # SPEC.md 19.2
 
 _TYPES = {APP_TYPE_BASE: 'base', APP_TYPE_UPD: 'update', APP_TYPE_DLC: 'dlc'}
@@ -167,7 +171,7 @@ class OwnfoilLibrary:
 
     @property
     def families(self):
-        base = {'library', 'titles', 'changes', 'cheats'}
+        base = {'library', 'titles', 'changes', 'cheats', 'sections'}
         return frozenset(base | ({'deltas'} if get_settings()['lantern']['deltas']['enabled'] else set()))
 
     def chunk_index(self, sha256):
@@ -184,6 +188,16 @@ class OwnfoilLibrary:
 
     def apps(self):
         return list(self._current()[0])
+
+    def sections(self, languages):
+        """The shelves Ownfoil curates: what was added lately, by kind of package; empty shelves are left out."""
+        shelves = []
+        apps = self.apps()
+        for shelf_id, title, kinds in SHELVES:
+            ids = [a.id for a in sorted((a for a in apps if a.type in kinds), key=lambda a: a.added or '', reverse=True)]
+            if ids:
+                shelves.append(Section(id=shelf_id, title=title, apps=ids[:SHELF_MAX]))
+        return shelves
 
     def titles(self, languages):
         self._current()

@@ -210,3 +210,24 @@ def test_a_mirror_lantern_refuses_is_left_out_and_the_game_stays(env):
     env.monkeypatch.setattr(lib, 'get_settings', lambda: {'lantern': {'mirrors': ['http://203.0.113.5/games']}})
     [app] = lib.OwnfoilLibrary().apps()  # plain HTTP beyond a private network is not a mirror (19.2)
     assert app.mirrors is None
+
+
+# Shelves.
+
+
+def test_the_shelves_hold_what_was_added_lately_by_kind(env):
+    UP = '0100AB1200010800'
+    old = env.seed('old.nsp', [(TITLE, '0', 'BASE', None)], data=b'old')
+    old.added_at = datetime.datetime(2026, 1, 1)
+    new = env.seed('new.nsp', [('0100CD3400020000', '0', 'BASE', None)], data=b'new')
+    new.added_at = datetime.datetime(2026, 6, 1)
+    env.seed('up.nsz', [(UP, '65536', 'UPDATE', '1.1.0')], data=b'up', extension='nsz')
+    db.session.commit()
+    library = lib.OwnfoilLibrary()
+    shelves = {s.id: s for s in library.sections(['en'])}
+    assert shelves['new'].apps[0] == next(a.id for a in library.apps() if a.app_id == '0100CD3400020000')
+    assert len(shelves['new'].apps) == 2 and len(shelves['updates'].apps) == 1 and 'dlc' not in shelves
+
+
+def test_no_shelf_without_apps(env):
+    assert lib.OwnfoilLibrary().sections(['en']) == []
