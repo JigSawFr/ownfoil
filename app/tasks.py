@@ -14,6 +14,7 @@ from containers import container
 from containers import nacp
 from containers import verification as verification_lib
 from constants import COMPRESS_EXT, DECOMPRESS_EXT
+from lantern_server import hashing as lantern_hashing
 from db import (
     db, Task, Files, Apps, Libraries, Titles, get_library_id, get_library_path, get_library_file_paths,
     get_libraries, add_title_id_in_db, get_title_id_db_id, add_file_to_app,
@@ -137,6 +138,7 @@ TASK_DISPLAY = {
     'verify_file': lambda **kw: f'Verify {_file_label(**kw)}',
     'compress_file': lambda **kw: f'Compress {_file_label(**kw)}',
     'decompress_file': lambda **kw: f'Decompress {_file_label(**kw)}',
+    'lantern_hash_file': lambda **kw: f'Hash {_file_label(**kw)}',
     'add_missing_apps': lambda **kw: 'Add missing content',
     'remove_missing_files': lambda **kw: 'Remove missing files',
     'update_titles': lambda **kw: 'Update titles',
@@ -878,6 +880,8 @@ STAGES = [
     Stage('organize', _needs_organize, _organize, None),
     Stage('verify', _needs_verify, None, 'verify_file'),
     Stage('compress', _needs_compress, None, 'compress_file'),
+    # Last: the hash is of the file as it will be served, once it has been organized or compressed.
+    Stage('lantern_hash', lantern_hashing.needs_hash, None, 'lantern_hash_file'),
 ]
 
 
@@ -1100,6 +1104,28 @@ def verify_file_task(file_id, manual=False, **kwargs):
 
     if error:
         logger.warning(f'Verification failed for {file_obj.filename}: {error}')
+    enqueue_task('process_file', {'file_id': file_id})
+
+
+# --- Lantern hashing ---
+@register_task('lantern_hash_file', group='io')
+def lantern_hash_file_task(file_id, **kwargs):
+    """Hash one file for Lantern, which lists a file only once its SHA-256 is known."""
+    file_obj = db.session.get(Files, file_id)
+    if file_obj is None or not os.path.exists(file_obj.filepath):
+        return
+    try:
+        recorded = lantern_hashing.hash_file(file_obj, progress=_task_progress(_current_task_id))
+    except OSError as e:
+        logger.warning(f'Could not hash {file_obj.filename}: {e}')
+        return
+    if not recorded:
+        # Not the file the row describes (or it changed under the read): the watcher or the next
+        # scan refreshes the row and drives the file down the stages again.
+        logger.info(f'Skipped hashing, the file changed: {file_obj.filename}')
+        return
+    db.session.commit()
+    logger.info(f'Hashed file: {file_obj.filename}')
     enqueue_task('process_file', {'file_id': file_id})
 
 
