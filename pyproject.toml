@@ -23,6 +23,7 @@ dependencies = [
     "flask-sock==0.7.0",
     "flask-sqlalchemy==3.1.1",
     "gunicorn==26.2.0 ; sys_platform != 'win32'",
+    "lantern-protocol[crypto,dnssd,flask] @ git+https://github.com/JigSawFr/lantern-sdk@00262c9c71a3f34234789798a455936fd5284f1b#subdirectory=python",
     "nstools==2.0.0b7",
     "nsz==5.0.0",
     "pillow==12.3.0",
@@ -42,6 +43,10 @@ Issues = "https://github.com/a1ex4/ownfoil/issues"
 
 [project.scripts]
 ownfoil = "ownfoil.cli:main"
+
+[tool.hatch.metadata]
+# The Lantern SDK is installed from Git until it has a release on PyPI.
+allow-direct-references = true
 
 [build-system]
 requires = ["hatchling"]
