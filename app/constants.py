@@ -101,6 +101,11 @@ DEFAULT_SETTINGS = {
     # Lantern, the open library protocol (see app/lantern_server). Off until turned on.
     "lantern": {
         "enabled": False,
+        # The port Lantern is served on over TLS, besides the shop's own plain HTTP port; 0 serves no TLS
+        # here, for an install behind a reverse proxy that does it (and then `proxy` below).
+        "https_port": 8466,
+        # Trust X-Forwarded-Proto: https from the reverse proxy in front, so that its requests count as TLS.
+        "proxy": False,
     },
     "services": {
         "discovery": {

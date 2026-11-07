@@ -151,7 +151,7 @@ def served(env):
 def _on(enabled):
     from settings import get_settings
     settings = dict(get_settings())
-    settings['lantern'] = {'enabled': enabled}
+    settings['lantern'] = {**settings['lantern'], 'enabled': enabled, 'https_port': 0}
     settings['shop'] = {**settings['shop'], 'public': True}
     return settings
 
