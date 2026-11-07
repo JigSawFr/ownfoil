@@ -415,6 +415,20 @@ class LanternChange(db.Model):
     platform = db.Column(db.String, nullable=False)
 
 
+class LanternRequest(db.Model):
+    """A request for a game (SPEC.md 11), made by a device of an account (`user`: the account's name)."""
+    __tablename__ = 'lantern_requests'
+    id = db.Column(db.String, primary_key=True)
+    user = db.Column(db.String, nullable=False, index=True)
+    platform = db.Column(db.String, nullable=False)
+    title_id = db.Column(db.String, nullable=False)
+    status = db.Column(db.String, nullable=False)
+    created = db.Column(db.String, nullable=False)
+    name = db.Column(db.String)
+    updated = db.Column(db.String)
+    reason = db.Column(db.String)
+
+
 class Task(db.Model):
     __tablename__ = 'tasks'
 
