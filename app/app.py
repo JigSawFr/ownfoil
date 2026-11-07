@@ -182,6 +182,8 @@ app.config['SOCK_SERVER_OPTIONS'] = {'ping_interval': 25}
 sock = Sock(app)
 realtime.init_app(app)
 import task_events  # noqa: F401 — registers the tasks/workers topics
+from lantern_server import service as lantern_service
+lantern_service.init_app(app)
 
 
 @sock.route('/api/ws')
