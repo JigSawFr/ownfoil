@@ -8,7 +8,10 @@ RUN apk update && apk add --no-cache bash sudo \
     fi
 
 COPY requirements.txt /tmp/
-RUN pip install --no-cache-dir --requirement /tmp/requirements.txt && rm /tmp/requirements.txt
+# git: the Lantern SDK is installed from its repository until it has a release on PyPI.
+RUN apk add --no-cache --virtual .git git \
+    && pip install --no-cache-dir --requirement /tmp/requirements.txt && rm /tmp/requirements.txt \
+    && apk del .git
 RUN if [ "$TARGETPLATFORM" = "linux/arm/v6" ] || [ "$TARGETPLATFORM" = "linux/arm/v7" ]; then \
         apk del build-base gcc musl-dev jpeg-dev zlib-dev libffi-dev cairo-dev pango-dev gdk-pixbuf-dev; \
     fi
