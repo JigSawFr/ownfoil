@@ -123,3 +123,24 @@ def test_the_task_leaves_a_changed_or_vanished_file_alone(env):
     assert queued == []
     tasks.lantern_hash_file_task(99999)  # no such row
     assert queued == []
+
+
+def test_the_queue_takes_bases_first_then_the_smallest(env):
+    from db import Apps, Titles
+    title = Titles(title_id='0100AB1200010000')
+    db.session.add(title)
+    db.session.commit()
+
+    def make(name, kind, size):
+        f = env.seed(name, b'x' * size)
+        row = Apps(title_id=title.id, app_id=name, app_version='0', app_type=kind, owned=True)
+        db.session.add(row)
+        f.apps.append(row)
+        db.session.commit()
+        return f
+
+    files = [make('update.nsp', 'UPDATE', 5), make('big-base.nsp', 'BASE', 50), make('dlc.nsp', 'DLC', 1),
+             make('small-base.nsp', 'BASE', 10)]
+    files.append(env.seed('unidentified.nsp', b'y'))
+    ordered = sorted(files, key=hashing.queue_rank)
+    assert [f.filename for f in ordered] == ['small-base.nsp', 'big-base.nsp', 'update.nsp', 'dlc.nsp', 'unidentified.nsp']

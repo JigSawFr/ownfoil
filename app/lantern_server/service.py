@@ -131,6 +131,8 @@ def init_app(app):
     app.add_url_rule(BASE + '/v1/<path:rest>', 'lantern_routes', view, methods=METHODS)
     # The page where a signed-in Ownfoil user approves a device (SPEC.md 5.2).
     app.add_url_rule('/pair', 'lantern_pair', view, methods=['GET', 'POST'])
+    from lantern_server import admin_page
+    admin_page.init_app(app)
 
 
 POLL_SECONDS = 2.0

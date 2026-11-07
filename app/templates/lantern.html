@@ -1,0 +1,82 @@
+{% extends "settings_layout.html" %}
+{% block panel %}
+<div class="settings-container container mt-3">
+    <h2 class="pb-2">Lantern</h2>
+    <p>Devices that speak <a href="https://lantern.boreale.dev" rel="noreferrer">Lantern</a> pair with a user's account instead of sharing a password.
+        To pair one, type the code it shows at <code>/pair</code> on the TLS port ({{ https_port or 'none' }}).</p>
+    {% if message %}<div class="alert alert-info">{{ message }}</div>{% endif %}
+
+    <form method="post" class="mb-4">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="enabled" name="enabled" value="1" {% if enabled %}checked{% endif %}>
+            <label class="form-check-label" for="enabled">Lantern is on</label>
+        </div>
+        <button name="action" value="toggle" class="btn btn-primary mt-2">Save</button>
+    </form>
+
+    <h3>Devices</h3>
+    {% if devices %}
+    <table class="table table-sm">
+        <thead><tr><th>Account</th><th>Device</th><th>Scopes</th><th>Paired</th><th></th></tr></thead>
+        <tbody>
+        {% for d in devices %}
+        <tr><td>{{ d.user }}</td><td>{{ d.device }}</td><td>{{ d.scopes|join(', ') }}</td><td>{{ d.created }}</td>
+            <td><form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="id" value="{{ d.id }}">
+                <button name="action" value="revoke" class="btn btn-sm btn-outline-danger">Revoke</button></form></td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}<p class="text-muted">No device is paired.</p>{% endif %}
+
+    <h3>Invitations</h3>
+    {% if invitations %}
+    <table class="table table-sm">
+        <thead><tr><th>Code</th><th>Account</th><th>Used</th><th>Expires</th><th>Note</th><th></th></tr></thead>
+        <tbody>
+        {% for i in invitations %}
+        <tr><td><code>{{ i.code }}</code></td><td>{{ i.user }}</td><td>{{ i.used }}/{{ i.devices }}</td><td>{{ i.expires }}</td><td>{{ i.note or '' }}</td>
+            <td><form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="id" value="{{ i.id }}">
+                <button name="action" value="revoke_invitation" class="btn btn-sm btn-outline-danger">Revoke</button></form></td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+    <form method="post" class="row g-2 align-items-end mb-4">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="col-auto"><label class="form-label" for="invUser">Account</label>
+            <select id="invUser" name="user" class="form-select">{% for u in users %}<option>{{ u }}</option>{% endfor %}</select></div>
+        <div class="col-auto"><label class="form-label" for="invHours">Valid for (hours)</label>
+            <input id="invHours" name="hours" type="number" min="1" max="720" value="24" class="form-control"></div>
+        <div class="col-auto"><label class="form-label" for="invDevices">Devices</label>
+            <input id="invDevices" name="devices" type="number" min="1" max="20" value="1" class="form-control"></div>
+        <div class="col-auto"><label class="form-label" for="invNote">Note</label>
+            <input id="invNote" name="note" maxlength="200" class="form-control"></div>
+        <div class="col-auto"><button name="action" value="invite" class="btn btn-secondary" {% if not users %}disabled{% endif %}>Invite</button></div>
+    </form>
+
+    <h3>Requests</h3>
+    {% if requests %}
+    <table class="table table-sm">
+        <thead><tr><th>Account</th><th>Game</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        {% for r in requests %}
+        <tr><td>{{ r.user }}</td><td>{{ r.name or r.title_id }}</td><td>{{ r.status }}</td>
+            <td>{% if r.status == 'open' %}<form method="post" class="d-flex gap-1"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="id" value="{{ r.id }}">
+                <input name="reason" placeholder="Reason, if declined" class="form-control form-control-sm">
+                <button name="action" value="done" class="btn btn-sm btn-outline-success">Done</button>
+                <button name="action" value="decline" class="btn btn-sm btn-outline-danger">Decline</button></form>{% endif %}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}<p class="text-muted">No request.</p>{% endif %}
+
+    <h3>Saves</h3>
+    {% if saves %}
+    <table class="table table-sm">
+        <thead><tr><th>Account</th><th>Backups</th><th>Size</th></tr></thead>
+        <tbody>{% for name, count, size in saves %}<tr><td>{{ name }}</td><td>{{ count }}</td><td>{{ size }}</td></tr>{% endfor %}</tbody>
+    </table>
+    {% else %}<p class="text-muted">No backup.</p>{% endif %}
+</div>
+{% endblock %}

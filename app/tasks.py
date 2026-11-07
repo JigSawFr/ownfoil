@@ -922,6 +922,7 @@ def process_library_task(**kwargs):
     """Drive every file that still has pipeline work."""
     mgmt = get_settings()['library']['management']
     files = [f for f in Files.query.all() if _has_pending_stage(f, mgmt)]
+    files.sort(key=lantern_hashing.queue_rank)  # bases first, then the smallest (see lantern_server.hashing)
     logger.info(f'Processing library: {len(files)} file(s) with pending work.')
     for f in files:
         enqueue_or_child('process_file', {'file_id': f.id})
