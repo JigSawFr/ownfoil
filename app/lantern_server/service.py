@@ -103,3 +103,47 @@ def init_app(app):
     app.add_url_rule(BASE + '/v1/<path:rest>', 'lantern_routes', view, methods=METHODS)
     # The page where a signed-in Ownfoil user approves a device (SPEC.md 5.2).
     app.add_url_rule('/pair', 'lantern_pair', view, methods=['GET', 'POST'])
+
+
+POLL_SECONDS = 2.0
+_watcher = None
+
+
+class Watcher(threading.Thread):
+    """Looks at the database now and then, so that the event streams hear of a change when it happens and not
+    when the next client happens to ask: Ownfoil's workers are other processes and tell nobody."""
+
+    def __init__(self, app, interval=POLL_SECONDS):
+        super().__init__(daemon=True, name='lantern-watch')
+        self.app, self.interval = app, interval
+        self._stop_event = threading.Event()
+
+    def run(self):
+        while not self._stop_event.wait(self.interval):
+            try:
+                with self.app.app_context():
+                    if get_settings()['lantern']['enabled']:
+                        current().library.refresh()
+            except Exception:  # a hiccup (a locked database, titledb being rebuilt) must not end the watch
+                logger.exception('Lantern: could not look at the library')
+
+    def stop(self):
+        self._stop_event.set()
+        self.join(timeout=5)
+
+
+def start_watching(app):
+    """Start the watcher once; it does nothing while Lantern is off."""
+    global _watcher
+    with _lock:
+        if _watcher is None:
+            _watcher = Watcher(app)
+            _watcher.start()
+
+
+def stop_watching():
+    global _watcher
+    with _lock:
+        watcher, _watcher = _watcher, None
+    if watcher is not None:
+        watcher.stop()

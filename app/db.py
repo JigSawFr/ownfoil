@@ -398,6 +398,23 @@ class LanternInvitation(db.Model):
     account = db.relationship('LanternAccount', backref=db.backref('invitations', passive_deletes=True))
 
 
+class LanternMeta(db.Model):
+    """Small facts Lantern keeps between runs: the journal's epoch, position and floor, and the baseline the
+    library is compared with to find what changed."""
+    __tablename__ = 'lantern_meta'
+    key = db.Column(db.String, primary_key=True)
+    value = db.Column(db.Text, nullable=False)
+
+
+class LanternChange(db.Model):
+    """One entry of the change journal (SPEC.md 6.4, 7.3): what changed, and for which platform."""
+    __tablename__ = 'lantern_journal'
+    position = db.Column(db.Integer, primary_key=True, autoincrement=False)
+    kind = db.Column(db.String, nullable=False)
+    key = db.Column(db.String, nullable=False)
+    platform = db.Column(db.String, nullable=False)
+
+
 class Task(db.Model):
     __tablename__ = 'tasks'
 

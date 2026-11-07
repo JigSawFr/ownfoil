@@ -68,9 +68,11 @@ def main(open_browser=False):
         from realtime import stop as stop_realtime
         from discovery import stop as stop_discovery
         from lantern_server.tls import stop as stop_lantern_tls
+        from lantern_server.service import stop_watching as stop_lantern_watch
         stop_realtime()
         stop_discovery()
         stop_lantern_tls()
+        stop_lantern_watch()
         if server is not None:
             server.server_close()
         app_mod.pool.shutdown()

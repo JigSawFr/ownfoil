@@ -11,11 +11,13 @@ import threading
 
 from lantern import schema
 from lantern.models import App, AppIncludes
+from lantern.server.events import LibraryChange
 from lantern.server.files import FileRef
 from sqlalchemy import func
 
 from constants import APP_TYPE_BASE, APP_TYPE_DLC, APP_TYPE_UPD, TITLES_DB_FILE
 from db import Apps, Files, Media, Titles, app_files, db
+from lantern_server import journal
 
 logger = logging.getLogger('main')
 
@@ -113,7 +115,10 @@ class OwnfoilLibrary:
 
     def __init__(self, base='/api/lantern'):
         self.base = base.rstrip('/')
-        self.families = frozenset({'library', 'titles'})
+        self.families = frozenset({'library', 'titles', 'changes'})
+        self._log = journal.OwnfoilChangeLog()
+        self._journal = journal.OwnfoilJournal(self._log, self)
+        self._listeners = []
         self._lock = threading.Lock()
         self._print = None
         self._apps = []
@@ -130,6 +135,10 @@ class OwnfoilLibrary:
                 self._apps, self._files = project(self.base)
                 self._titles, self._media = sheets.project(self._apps, self.base)
                 self._print = print_
+                changes = journal.compare(self._log, self._apps, self._titles, PLATFORM)
+                for family, title_id in changes:
+                    for listener in list(self._listeners):
+                        listener(LibraryChange(family, PLATFORM, title_id))
             return self._apps, self._files
 
     def apps(self):
@@ -176,4 +185,12 @@ class OwnfoilLibrary:
         return None
 
     def journal(self):
-        return None
+        return self._journal
+
+    def subscribe(self, listener):
+        """Calls `listener` with each change of the library, as it is found (the event `library`)."""
+        self._listeners.append(listener)
+
+    def refresh(self):
+        """Look at the database now: what changed is recorded and told to the listeners."""
+        self._current()
