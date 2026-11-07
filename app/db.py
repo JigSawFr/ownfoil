@@ -429,6 +429,33 @@ class LanternRequest(db.Model):
     reason = db.Column(db.String)
 
 
+class LanternSyncAccount(db.Model):
+    """An account's sync data as a whole: the generation changes only when the data is erased (SPEC.md 20)."""
+    __tablename__ = 'lantern_sync_accounts'
+    user = db.Column(db.String, primary_key=True)
+    generation = db.Column(db.String, nullable=False)
+
+
+class LanternSyncCollection(db.Model):
+    __tablename__ = 'lantern_sync_collections'
+    user = db.Column(db.String, primary_key=True)
+    name = db.Column(db.String, primary_key=True)
+    rev = db.Column(db.Integer, nullable=False)
+    floor = db.Column(db.Integer, nullable=False)
+
+
+class LanternSyncItem(db.Model):
+    __tablename__ = 'lantern_sync_items'
+    user = db.Column(db.String, primary_key=True)
+    collection = db.Column(db.String, primary_key=True)
+    key = db.Column(db.String, primary_key=True)
+    updated = db.Column(db.String, nullable=False)
+    value = db.Column(db.Text)
+    deleted = db.Column(db.Integer, nullable=False)
+    rev = db.Column(db.Integer, nullable=False)
+    kept = db.Column(db.String, nullable=False)
+
+
 class Task(db.Model):
     __tablename__ = 'tasks'
 
