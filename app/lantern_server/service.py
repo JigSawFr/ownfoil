@@ -13,6 +13,7 @@ import flask
 from lantern.server.app import LanternApp
 from lantern.server.flask import METHODS, to_request, to_response
 from lantern.server.http import ServerResponse
+from lantern.server.saves import FileSaveStore, SaveLimits
 from lantern.server.secrets_file import SecretsFile
 
 from constants import APP_VERSION, CONFIG_DIR
@@ -26,9 +27,26 @@ logger = logging.getLogger('main')
 
 BASE = '/api/lantern'
 
-_lock = threading.Lock()
+_lock = threading.RLock()  # build() runs under it and asks for the shared stores
 _state = {'key': None, 'lantern': None}
 _vault = SecretsFile(os.path.join(CONFIG_DIR, 'lantern-secrets.json'))
+_stores = {}  # what Lantern keeps beside the database, made once and shared by every LanternApp
+
+
+def saves():
+    """The backups of saves (SPEC.md 9), in a folder of the config: one store for the life of the process."""
+    with _lock:
+        if 'saves' not in _stores:
+            _stores['saves'] = FileSaveStore(os.path.join(CONFIG_DIR, 'lantern-saves'))
+        return _stores['saves']
+
+
+def forget_user(user_id):
+    """An Ownfoil user is going: what Lantern kept for their account goes with them."""
+    from db import LanternAccount
+    account = LanternAccount.query.filter_by(user_id=user_id).first()
+    if account is not None:
+        saves().forget(account.name)
 
 
 def is_loopback(address):
@@ -66,6 +84,8 @@ def build():
         scheme='https' if behind_proxy else None,
         accounts=OwnfoilAccounts(),
         pair_page=lambda request: pairing_page.page(lantern, request),
+        saves=saves(),
+        save_limits=SaveLimits(),
     )
     return lantern
 

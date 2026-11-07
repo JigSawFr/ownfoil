@@ -339,6 +339,8 @@ def delete_user():
     data = request.json
     user_id = data['user_id']
     try:
+        from lantern_server import service as lantern_service
+        lantern_service.forget_user(user_id)  # their backups and the like go with them
         User.query.filter_by(id=user_id).delete()
         db.session.commit()
         logger.info(f'Successfully deleted user with id {user_id}.')
