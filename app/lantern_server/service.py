@@ -84,6 +84,7 @@ def build():
         platforms=['switch'],
         public=bool(shop['public']),
         secret=_vault.get('cursor'),
+        grant_seed=_vault.get('grant', 32),  # signs the grants peers check; it never leaves this server
         spki=None if behind_proxy else own_key,
         scheme='https' if behind_proxy else None,
         accounts=OwnfoilAccounts(),

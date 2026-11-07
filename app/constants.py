@@ -106,6 +106,9 @@ DEFAULT_SETTINGS = {
         "https_port": 8466,
         # Trust X-Forwarded-Proto: https from the reverse proxy in front, so that its requests count as TLS.
         "proxy": False,
+        # Other places that serve the same files, which clients may read them from instead (Lantern 19.2):
+        # the address of a copy of the library, whose files are found by the same path as here.
+        "mirrors": [],
     },
     "services": {
         "discovery": {

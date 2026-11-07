@@ -185,3 +185,28 @@ def test_nothing_is_served_while_lantern_is_off(env, served):
     env.monkeypatch.setattr(service, 'get_settings', lambda: _on(False))
     response = served.get('/.well-known/lantern', base_url='https://shop.example.org')
     assert response.status_code == 404
+
+
+# Mirrors and peers.
+
+
+def test_a_mirror_is_the_address_of_a_copy_followed_by_the_files_path(env):
+    f = env.seed('Lumen Drift [0100AB1200010000][v0].nsp', [(TITLE, '0', 'BASE', None)])
+    env.monkeypatch.setattr(lib, 'get_settings', lambda: {'lantern': {'mirrors': ['https://nas.example.org/games/', 'https://b.example.org']}})
+    [app] = lib.OwnfoilLibrary().apps()
+    assert [m.url for m in app.mirrors] == [
+        'https://nas.example.org/games/Lumen%20Drift%20%5B0100AB1200010000%5D%5Bv0%5D.nsp',
+        'https://b.example.org/Lumen%20Drift%20%5B0100AB1200010000%5D%5Bv0%5D.nsp']
+
+
+def test_no_mirror_unless_one_is_named(env):
+    env.seed('a.nsp', [(TITLE, '0', 'BASE', None)])
+    [app] = lib.OwnfoilLibrary().apps()
+    assert app.mirrors is None
+
+
+def test_a_mirror_lantern_refuses_is_left_out_and_the_game_stays(env):
+    env.seed('a.nsp', [(TITLE, '0', 'BASE', None)])
+    env.monkeypatch.setattr(lib, 'get_settings', lambda: {'lantern': {'mirrors': ['http://203.0.113.5/games']}})
+    [app] = lib.OwnfoilLibrary().apps()  # plain HTTP beyond a private network is not a mirror (19.2)
+    assert app.mirrors is None

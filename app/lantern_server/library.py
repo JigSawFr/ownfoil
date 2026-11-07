@@ -8,9 +8,10 @@ import logging
 import os
 import re
 import threading
+from urllib.parse import quote
 
 from lantern import schema
-from lantern.models import App, AppIncludes
+from lantern.models import App, AppIncludes, Mirror
 from lantern.server.events import LibraryChange
 from lantern.server.files import FileRef
 from sqlalchemy import func
@@ -18,6 +19,7 @@ from sqlalchemy import func
 from constants import APP_TYPE_BASE, APP_TYPE_DLC, APP_TYPE_UPD, TITLES_DB_FILE
 import db as db_models
 from db import Apps, Files, Media, Titles, app_files, db
+from settings import get_settings
 from lantern_server import journal
 
 logger = logging.getLogger('main')
@@ -25,6 +27,7 @@ logger = logging.getLogger('main')
 PLATFORM = 'switch'
 FORMATS = frozenset({'nsp', 'nsz', 'xci', 'xcz'})
 INCLUDES_MAX = 16  # SPEC.md 6.1
+MIRRORS_MAX = 8  # SPEC.md 19.2
 
 _TYPES = {APP_TYPE_BASE: 'base', APP_TYPE_UPD: 'update', APP_TYPE_DLC: 'dlc'}
 _RANK = {'base': 0, 'update': 1, 'dlc': 2}
@@ -57,7 +60,18 @@ def _version(text):
     return int(text) if text and str(text).isdigit() else 0
 
 
-def project(base):
+def mirrors_of(file, mirrors):
+    """The other addresses of a file: each mirror's address followed by the file's path in its library."""
+    if not mirrors or file.library is None:
+        return None
+    relative = os.path.relpath(file.filepath, file.library.path).replace(os.sep, '/')
+    if relative.startswith('../'):
+        return None
+    found = [Mirror(url=m.rstrip('/') + '/' + quote(relative)) for m in mirrors if isinstance(m, str) and m]
+    return found[:MIRRORS_MAX] or None
+
+
+def project(base, mirrors=()):
     """(apps, files) for the files that have a current hash: the App documents, and by file id what to serve."""
     rows = (db.session.query(Files, Apps, Titles.title_id)
             .join(app_files, app_files.c.file_id == Files.id)
@@ -88,8 +102,14 @@ def project(base):
             type=kind, version_code=_version(main.app_version), version_name=main.display_version or None,
             name=_name(main, file), size=file.size, format=file.extension,
             includes=includes or None, sha256=file.sha256, added=_iso(file.added_at),
+            mirrors=mirrors_of(file, mirrors),
             file=f'{base}/v1/files/f_{file.download_token}')
         problems = schema.definition('app', document.to_json())
+        if problems and document.mirrors:
+            # A mirror Lantern refuses (plain HTTP beyond a private network, say) must not hide the game.
+            logger.warning(f'Lantern: mirrors of {file.filename} left out ({"; ".join(problems[:1])})')
+            document.mirrors = None
+            problems = schema.definition('app', document.to_json())
         if problems:
             logger.warning(f'Lantern: not listing {file.filename} ({"; ".join(problems[:2])})')
             continue
@@ -130,10 +150,10 @@ class OwnfoilLibrary:
     def _current(self):
         """The projection, rebuilt only when the database moved since the last one."""
         with self._lock:
-            print_ = fingerprint()
+            print_ = (fingerprint(), tuple(self._mirrors()))
             if print_ != self._print:
                 from lantern_server import titles as sheets
-                self._apps, self._files = project(self.base)
+                self._apps, self._files = project(self.base, self._mirrors())
                 self._titles, self._media = sheets.project(self._apps, self.base)
                 self._print = print_
                 changes = journal.compare(self._log, self._apps, self._titles, PLATFORM)
@@ -141,6 +161,10 @@ class OwnfoilLibrary:
                     for listener in list(self._listeners):
                         listener(LibraryChange(family, PLATFORM, title_id))
             return self._apps, self._files
+
+    @staticmethod
+    def _mirrors():
+        return [m for m in get_settings()['lantern']['mirrors'] if isinstance(m, str)]
 
     def apps(self):
         return list(self._current()[0])
