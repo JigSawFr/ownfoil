@@ -40,6 +40,7 @@ def init():
     # Start UDP discovery for clients on the LAN
     discovery.reconcile()
     lantern_tls.reconcile(app)
+    lantern_service.start_watching(app)
 
     # init libraries
     library_paths = get_library_paths()
