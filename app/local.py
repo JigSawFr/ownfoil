@@ -67,8 +67,10 @@ def main(open_browser=False):
         # make_server exits the process on a bind failure, so guard the cleanup below.
         from realtime import stop as stop_realtime
         from discovery import stop as stop_discovery
+        from lantern_server.tls import stop as stop_lantern_tls
         stop_realtime()
         stop_discovery()
+        stop_lantern_tls()
         if server is not None:
             server.server_close()
         app_mod.pool.shutdown()

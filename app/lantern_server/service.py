@@ -17,6 +17,7 @@ from lantern.server.secrets_file import SecretsFile
 
 from constants import APP_VERSION, CONFIG_DIR
 from lantern_server.identity import lantern_uid
+from lantern_server import tls
 from lantern_server.library import OwnfoilLibrary
 from settings import get_settings
 
@@ -37,13 +38,19 @@ def is_loopback(address):
 
 
 def served_securely(request):
-    """Whether this request may be answered as Lantern: over TLS, or from this very machine."""
-    return request.is_secure or is_loopback(request.remote_addr or '')
+    """Whether this request may be answered as Lantern: over TLS (here, or at the reverse proxy the settings
+    name), or from this very machine."""
+    if request.is_secure or is_loopback(request.remote_addr or ''):
+        return True
+    return bool(get_settings()['lantern']['proxy']) and request.headers.get('X-Forwarded-Proto') == 'https'
 
 
 def build():
     """A LanternApp for the shop as it is configured now."""
-    shop = get_settings()['shop']
+    settings = get_settings()
+    shop = settings['shop']
+    behind_proxy = bool(settings['lantern']['proxy'])
+    own_key = tls.spki() if settings['lantern']['https_port'] and os.path.exists(tls.CERT_FILE) else None
     return LanternApp(
         OwnfoilLibrary(BASE),
         uid=lantern_uid(),
@@ -54,13 +61,17 @@ def build():
         platforms=['switch'],
         public=bool(shop['public']),
         secret=_vault.get('cursor'),
+        spki=None if behind_proxy else own_key,
+        scheme='https' if behind_proxy else None,
     )
 
 
 def current():
     """The LanternApp, rebuilt only when what it shows of the shop changed."""
     shop = get_settings()['shop']
-    key = (shop['name'], shop['motd'], bool(shop['public']))
+    settings = get_settings()
+    key = (shop['name'], shop['motd'], bool(shop['public']), bool(settings['lantern']['proxy']),
+           settings['lantern']['https_port'])
     with _lock:
         if _state['key'] != key:
             _state['lantern'], _state['key'] = build(), key

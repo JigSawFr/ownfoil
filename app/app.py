@@ -39,6 +39,7 @@ def init():
 
     # Start UDP discovery for clients on the LAN
     discovery.reconcile()
+    lantern_tls.reconcile(app)
 
     # init libraries
     library_paths = get_library_paths()
@@ -90,6 +91,7 @@ def on_settings_change():
             logger.info(f'Settings changed: scaling workers from {pool.count} to {desired}')
             pool.scale(desired)
     discovery.reconcile()
+    lantern_tls.reconcile(app)
     if watcher is not None:
         # Reconcile off this thread: this callback runs inside the native observer's dispatch,
         # which holds the observer lock that schedule/unschedule also need.
@@ -183,6 +185,7 @@ sock = Sock(app)
 realtime.init_app(app)
 import task_events  # noqa: F401 — registers the tasks/workers topics
 from lantern_server import service as lantern_service
+from lantern_server import tls as lantern_tls
 lantern_service.init_app(app)
 
 
