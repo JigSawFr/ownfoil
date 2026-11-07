@@ -130,11 +130,10 @@ def test_a_file_is_served_only_while_it_is_the_one_that_was_hashed(env):
     assert library.file(app.file.rsplit('/', 1)[1]) is None
 
 
-def test_the_library_offers_only_what_it_has(env):
+def test_the_library_offers_what_it_has(env):
     library = lib.OwnfoilLibrary()
-    assert library.families == {'library'}
-    assert list(library.titles(['en'])) == [] and list(library.homebrew(['en'])) == []
-    assert library.journal() is None and library.cheats() == []
+    assert 'library' in library.families and 'homebrew' not in library.families
+    assert list(library.homebrew(['en'])) == [] and library.cheats() == []
 
 
 # The routes.

@@ -14,8 +14,8 @@ from lantern.models import App, AppIncludes
 from lantern.server.files import FileRef
 from sqlalchemy import func
 
-from constants import APP_TYPE_BASE, APP_TYPE_DLC, APP_TYPE_UPD
-from db import Apps, Files, Titles, app_files, db
+from constants import APP_TYPE_BASE, APP_TYPE_DLC, APP_TYPE_UPD, TITLES_DB_FILE
+from db import Apps, Files, Media, Titles, app_files, db
 
 logger = logging.getLogger('main')
 
@@ -38,7 +38,12 @@ def fingerprint():
     apps = session.query(func.count(Apps.id), func.coalesce(func.sum(Apps.id), 0),
                          func.coalesce(func.count(Apps.display_version), 0)).one()
     links = session.query(func.count()).select_from(app_files).scalar()
-    return tuple(hashed), tuple(apps), links
+    artwork = session.query(func.count(Media.id), func.coalesce(func.max(Media.id), 0)).one()
+    try:
+        titledb_stamp = os.stat(TITLES_DB_FILE).st_mtime_ns
+    except OSError:
+        titledb_stamp = 0
+    return tuple(hashed), tuple(apps), links, tuple(artwork), titledb_stamp
 
 
 def _iso(moment):
@@ -108,18 +113,22 @@ class OwnfoilLibrary:
 
     def __init__(self, base='/api/lantern'):
         self.base = base.rstrip('/')
-        self.families = frozenset({'library'})
+        self.families = frozenset({'library', 'titles'})
         self._lock = threading.Lock()
         self._print = None
         self._apps = []
         self._files = {}
+        self._titles = []
+        self._media = {}
 
     def _current(self):
         """The projection, rebuilt only when the database moved since the last one."""
         with self._lock:
             print_ = fingerprint()
             if print_ != self._print:
+                from lantern_server import titles as sheets
                 self._apps, self._files = project(self.base)
+                self._titles, self._media = sheets.project(self._apps, self.base)
                 self._print = print_
             return self._apps, self._files
 
@@ -127,7 +136,21 @@ class OwnfoilLibrary:
         return list(self._current()[0])
 
     def titles(self, languages):
-        return []
+        self._current()
+        return list(self._titles)
+
+    def media(self, name):
+        """A picture of a title, served under its SHA-256 (SPEC.md 7.1)."""
+        self._current()
+        entry = self._media.get(name)
+        if entry is None:
+            return None
+        path, size, content_type, sha256 = entry
+        try:
+            info = os.stat(path)
+        except OSError:
+            return None
+        return FileRef(path, size, sha256, content_type) if info.st_size == size else None
 
     def homebrew(self, languages):
         return []
