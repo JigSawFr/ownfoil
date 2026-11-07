@@ -456,6 +456,19 @@ class LanternSyncItem(db.Model):
     kept = db.Column(db.String, nullable=False)
 
 
+class LanternCheat(db.Model):
+    """A set of cheats written by a client (SPEC.md 10): Atmosphere's text, for one build of a game."""
+    __tablename__ = 'lantern_cheats'
+    id = db.Column(db.String, primary_key=True)
+    platform = db.Column(db.String, nullable=False)
+    title_id = db.Column(db.String, nullable=False, index=True)
+    build_id = db.Column(db.String)
+    source = db.Column(db.String)
+    note = db.Column(db.String)
+    updated = db.Column(db.String, nullable=False)
+    text = db.Column(db.Text, nullable=False)
+
+
 class Task(db.Model):
     __tablename__ = 'tasks'
 
