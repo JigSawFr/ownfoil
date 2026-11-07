@@ -20,6 +20,7 @@ from constants import APP_VERSION, CONFIG_DIR
 from lantern_server.identity import lantern_uid
 from lantern_server import pairing_page, tls
 from lantern_server.accounts import OwnfoilAccounts
+from lantern_server.requests import OwnfoilRequests
 from lantern_server.library import OwnfoilLibrary
 from settings import get_settings
 
@@ -47,6 +48,7 @@ def forget_user(user_id):
     account = LanternAccount.query.filter_by(user_id=user_id).first()
     if account is not None:
         saves().forget(account.name)
+        OwnfoilRequests().forget(account.name)
 
 
 def is_loopback(address):
@@ -85,6 +87,7 @@ def build():
         accounts=OwnfoilAccounts(),
         pair_page=lambda request: pairing_page.page(lantern, request),
         saves=saves(),
+        requests=OwnfoilRequests(),
         save_limits=SaveLimits(),
     )
     return lantern
