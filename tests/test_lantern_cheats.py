@@ -31,7 +31,7 @@ def shop(tmp_path, monkeypatch):
 def folder_file(tmp_path, title=TITLE, build=BUILD, text=TEXT):
     directory = tmp_path / 'cheats' / title
     directory.mkdir(parents=True, exist_ok=True)
-    (directory / f'{build}.txt').write_text(text)
+    (directory / f'{build}.txt').write_bytes(text.encode())
 
 
 def test_the_folder_is_read_as_atmospheres_layout_has_it(shop, tmp_path):
