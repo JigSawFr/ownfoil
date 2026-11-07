@@ -469,6 +469,15 @@ class LanternCheat(db.Model):
     text = db.Column(db.Text, nullable=False)
 
 
+class LanternChunks(db.Model):
+    """The chunk index of a file (SPEC.md 22), by the file's SHA-256: cut when the file was hashed."""
+    __tablename__ = 'lantern_chunks'
+    sha256 = db.Column(db.String(64), primary_key=True)
+    ref_size = db.Column(db.Integer, nullable=False)
+    ref_sha256 = db.Column(db.String(64), nullable=False)
+    raw = db.deferred(db.Column(db.LargeBinary, nullable=False))
+
+
 class Task(db.Model):
     __tablename__ = 'tasks'
 

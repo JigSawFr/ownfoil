@@ -11,14 +11,14 @@ import threading
 from urllib.parse import quote
 
 from lantern import schema
-from lantern.models import App, AppIncludes, Mirror
+from lantern.models import App, AppIncludes, ChunksRef, Mirror
 from lantern.server.events import LibraryChange
 from lantern.server.files import FileRef
 from sqlalchemy import func
 
 from constants import APP_TYPE_BASE, APP_TYPE_DLC, APP_TYPE_UPD, TITLES_DB_FILE
 import db as db_models
-from db import Apps, Files, Media, Titles, app_files, db
+from db import Apps, Files, LanternChunks, Media, Titles, app_files, db
 from settings import get_settings
 from lantern_server import journal
 
@@ -45,11 +45,12 @@ def fingerprint():
                          func.coalesce(func.count(Apps.display_version), 0)).one()
     links = session.query(func.count()).select_from(app_files).scalar()
     artwork = session.query(func.count(Media.id), func.coalesce(func.max(Media.id), 0)).one()
+    cut = session.query(func.count(LanternChunks.sha256)).scalar()
     try:
         titledb_stamp = os.stat(TITLES_DB_FILE).st_mtime_ns
     except OSError:
         titledb_stamp = 0
-    return tuple(hashed), tuple(apps), links, tuple(artwork), titledb_stamp
+    return tuple(hashed), tuple(apps), links, tuple(artwork), titledb_stamp, cut
 
 
 def _iso(moment):
@@ -72,6 +73,9 @@ def mirrors_of(file, mirrors):
 
 
 def project(base, mirrors=()):
+    refs = {r.sha256: r for r in db.session.query(LanternChunks.sha256, LanternChunks.ref_size, LanternChunks.ref_sha256).all()}
+    refs = {sha: ChunksRef.from_json({'url': f'{base}/v1/chunks/sha256/{sha}', 'size': r.ref_size, 'sha256': r.ref_sha256})
+            for sha, r in refs.items()}
     """(apps, files) for the files that have a current hash: the App documents, and by file id what to serve."""
     rows = (db.session.query(Files, Apps, Titles.title_id)
             .join(app_files, app_files.c.file_id == Files.id)
@@ -102,7 +106,7 @@ def project(base, mirrors=()):
             type=kind, version_code=_version(main.app_version), version_name=main.display_version or None,
             name=_name(main, file), size=file.size, format=file.extension,
             includes=includes or None, sha256=file.sha256, added=_iso(file.added_at),
-            mirrors=mirrors_of(file, mirrors),
+            mirrors=mirrors_of(file, mirrors), chunks=refs.get(file.sha256),
             file=f'{base}/v1/files/f_{file.download_token}')
         problems = schema.definition('app', document.to_json())
         if problems and document.mirrors:
@@ -136,7 +140,6 @@ class OwnfoilLibrary:
 
     def __init__(self, base='/api/lantern'):
         self.base = base.rstrip('/')
-        self.families = frozenset({'library', 'titles', 'changes', 'cheats'})
         self._log = journal.OwnfoilChangeLog()
         self._journal = journal.OwnfoilJournal(self._log, self)
         self._listeners = []
@@ -161,6 +164,19 @@ class OwnfoilLibrary:
                     for listener in list(self._listeners):
                         listener(LibraryChange(family, PLATFORM, title_id))
             return self._apps, self._files
+
+    @property
+    def families(self):
+        base = {'library', 'titles', 'changes', 'cheats'}
+        return frozenset(base | ({'deltas'} if get_settings()['lantern']['deltas']['enabled'] else set()))
+
+    def chunk_index(self, sha256):
+        """The chunk index of the file whose SHA-256 this is (Lantern 22), if it was cut."""
+        row = LanternChunks.query.filter_by(sha256=sha256).first()
+        try:
+            return row.raw if row is not None else None
+        finally:
+            db.session.rollback()
 
     @staticmethod
     def _mirrors():
