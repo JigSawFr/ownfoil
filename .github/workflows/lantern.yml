@@ -1,0 +1,41 @@
+name: Lantern conformance
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  conformance:
+    name: Lantern's reference suite
+    if: ${{ !startsWith(github.event.head_commit.message, 'ci') && !startsWith(github.event.head_commit.message, 'doc') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Checkout the Lantern repository, which holds the suite
+        uses: actions/checkout@v7
+        with:
+          repository: JigSawFr/lantern
+          path: lantern-spec
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.14'
+          enable-cache: true
+          cache-dependency-glob: requirements.txt
+
+      - name: Create virtualenv
+        run: uv venv
+
+      - name: Install dependencies
+        run: uv pip install --requirement requirements.txt --requirement lantern-spec/tools/requirements.txt pytest
+
+      - name: Run the suite against a throwaway Ownfoil
+        run: uv run pytest tests/test_lantern_conformance.py -v
+        env:
+          LANTERN_REPO: ${{ github.workspace }}/lantern-spec
+        timeout-minutes: 20

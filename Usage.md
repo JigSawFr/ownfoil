@@ -142,6 +142,39 @@ Sphaira identifies itself in its requests since version `1.0.6`, which Ownfoil n
 > [!TIP]
 > Check the `Setup` page in the Web UI for specific instructions on configuring each app, using local or remote access.
 
+## Lantern
+
+[Lantern](https://lantern.boreale.dev) is an open protocol between game library servers and their clients: pairing a device once instead of sharing a password, backing up saves, wish lists, cheats, requests for games, updates that download only what changed. Ownfoil speaks it besides the clients above, with the Lantern SDK. It is **off by default**; turn it on in `settings.yaml`:
+
+```yaml
+lantern:
+  enabled: true
+```
+
+What it does:
+
+* **Hashes your files.** Lantern lists a file only once its SHA-256 is known, so every file is read once, in the background (the `Tasks` page shows it, one at a time like verification and compression). A file that changes is hashed again.
+* **Is served over TLS, on its own port** (`https_port`, `8466`), with a self-signed certificate made on first start in `lantern-tls/` of the config folder. The device shows the key's fingerprint when it pairs and pins it. Put your own `cert.pem` and `key.pem` there to use them instead. Lantern is never served in plain HTTP beyond the machine itself. Behind a reverse proxy that does TLS, set `https_port: 0` and `proxy: true`.
+* **Pairs devices to users.** The device shows a code; type it at `https://<server>:8466/pair`, signed in to Ownfoil. The device gets a token for **your** account, no more than your access allows: shop access reads the library, backup access adds saves and sync, admin access everything (including answering requests and writing cheats).
+* **Announces itself** on the local network (`dnssd`, on by default) so that devices find it without an address.
+
+Other settings under `lantern:`
+
+| Setting | What it does |
+| --- | --- |
+| `https_port` | The TLS port. `0` serves no TLS here. |
+| `proxy` | Trust `X-Forwarded-Proto: https` from the reverse proxy in front. |
+| `dnssd` | Announce the TLS port on the local network. |
+| `cors_origins` | Origins whose web pages may read the server (`https://app.example.org`). None by default. |
+| `mirrors` | Addresses of copies of the library elsewhere that serve the same files by the same paths; clients may read files from them. |
+| `deltas` | `enabled`, `types`, `min` and `max` (bytes): cut the files of those types and sizes into chunks while hashing them, so that a device downloads only what changed. Off by default: cutting is slow. |
+
+Cheats: drop Atmosphere\'s files as `cheats/<title id>/<build id>.txt` in the config folder, or let a device with an admin account write them. Saves are kept in `lantern-saves/`, the rest in the database.
+
+To publish a copy of the library as plain files that any web server can serve, run `python -m lantern_server.export <folder>` from the application's folder (`/app` in the container).
+
+Ownfoil does not manage homebrew, so it does not offer Lantern\'s homebrew family.
+
 ## Content filters
 
 Adding a path to the shop URL configured in your client filters what it serves:
