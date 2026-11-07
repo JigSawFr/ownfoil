@@ -148,6 +148,11 @@ class Files(db.Model):
     verification_error = db.Column(db.String)
     verified_at = db.Column(db.DateTime)
     mtime = db.Column(db.Float)
+    # SHA-256 of the file's bytes, as Lantern lists it, with the size and mtime it was computed
+    # under: a hash only counts while they still match the row's (see lantern_server.hashing).
+    sha256 = db.Column(db.String(64), index=True)
+    sha256_size = db.Column(db.Integer)
+    sha256_mtime = db.Column(db.Float)
     # When ownfoil first saw the file. Distinct from mtime, which a re-organize or a
     # copy rewrites - only this one can answer "recently added".
     added_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)

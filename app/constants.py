@@ -98,6 +98,10 @@ DEFAULT_SETTINGS = {
     "server": {
         "uid": "",
     },
+    # Lantern, the open library protocol (see app/lantern_server). Off until turned on.
+    "lantern": {
+        "enabled": False,
+    },
     "services": {
         "discovery": {
             "enabled": True,
