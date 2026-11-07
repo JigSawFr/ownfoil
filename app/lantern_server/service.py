@@ -18,7 +18,7 @@ from lantern.server.secrets_file import SecretsFile
 
 from constants import APP_VERSION, CONFIG_DIR
 from lantern_server.identity import lantern_uid
-from lantern_server import pairing_page, tls
+from lantern_server import hashing, pairing_page, tls
 from lantern_server.accounts import OwnfoilAccounts
 from lantern_server.requests import OwnfoilRequests
 from lantern_server.sync import OwnfoilSync
@@ -133,6 +133,7 @@ def init_app(app):
 
 
 POLL_SECONDS = 2.0
+PRUNE_EVERY = 150  # rounds: every five minutes
 _watcher = None
 
 
@@ -146,11 +147,15 @@ class Watcher(threading.Thread):
         self._stop_event = threading.Event()
 
     def run(self):
+        rounds = 0
         while not self._stop_event.wait(self.interval):
+            rounds += 1
             try:
                 with self.app.app_context():
                     if get_settings()['lantern']['enabled']:
                         current().library.refresh()
+                        if rounds % PRUNE_EVERY == 0:
+                            hashing.prune_chunks()
             except Exception:  # a hiccup (a locked database, titledb being rebuilt) must not end the watch
                 logger.exception('Lantern: could not look at the library')
 
