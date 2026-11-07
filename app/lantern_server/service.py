@@ -17,7 +17,8 @@ from lantern.server.secrets_file import SecretsFile
 
 from constants import APP_VERSION, CONFIG_DIR
 from lantern_server.identity import lantern_uid
-from lantern_server import tls
+from lantern_server import pairing_page, tls
+from lantern_server.accounts import OwnfoilAccounts
 from lantern_server.library import OwnfoilLibrary
 from settings import get_settings
 
@@ -51,7 +52,7 @@ def build():
     shop = settings['shop']
     behind_proxy = bool(settings['lantern']['proxy'])
     own_key = tls.spki() if settings['lantern']['https_port'] and os.path.exists(tls.CERT_FILE) else None
-    return LanternApp(
+    lantern = LanternApp(
         OwnfoilLibrary(BASE),
         uid=lantern_uid(),
         name=shop['name'] or 'Ownfoil',
@@ -63,7 +64,10 @@ def build():
         secret=_vault.get('cursor'),
         spki=None if behind_proxy else own_key,
         scheme='https' if behind_proxy else None,
+        accounts=OwnfoilAccounts(),
+        pair_page=lambda request: pairing_page.page(lantern, request),
     )
+    return lantern
 
 
 def current():
@@ -85,7 +89,10 @@ def view(rest=''):
     request = to_request(flask.request, lantern.body_limit)
     if isinstance(request, ServerResponse):  # already answered (a body too large)
         return to_response(request)
-    return to_response(lantern.handle(request))
+    response = to_response(lantern.handle(request))
+    # A stream (events) is read after this function returns, and still needs the app context for the database.
+    response.response = flask.stream_with_context(response.response)
+    return response
 
 
 def init_app(app):
@@ -94,3 +101,5 @@ def init_app(app):
     app.add_url_rule(BASE + '/v1', 'lantern_v1', view, methods=METHODS)
     app.add_url_rule(BASE + '/v1/', 'lantern_v1_slash', view, methods=METHODS)
     app.add_url_rule(BASE + '/v1/<path:rest>', 'lantern_routes', view, methods=METHODS)
+    # The page where a signed-in Ownfoil user approves a device (SPEC.md 5.2).
+    app.add_url_rule('/pair', 'lantern_pair', view, methods=['GET', 'POST'])

@@ -349,6 +349,55 @@ class User(UserMixin, db.Model):
         elif access == 'backup':
             return self.has_backup_access()
 
+class LanternAccount(db.Model):
+    """A Lantern account (SPEC.md 5.7). One that belongs to an Ownfoil user (`user_id`) is capped by what that
+    user may do and goes with them; one made through Lantern's administration API has no Ownfoil user."""
+    __tablename__ = 'lantern_accounts'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64), unique=True, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE"), unique=True)
+    scopes = db.Column(db.String, nullable=False, default='')
+    state = db.Column(db.String, nullable=False, default='active')
+    created = db.Column(db.String, nullable=False)
+
+    user = db.relationship('User', backref=db.backref('lantern_account', uselist=False, passive_deletes=True))
+
+
+class LanternDevice(db.Model):
+    """A paired device: the hash of its token, never the token."""
+    __tablename__ = 'lantern_devices'
+    id = db.Column(db.String, primary_key=True)
+    account_id = db.Column(db.Integer, db.ForeignKey('lantern_accounts.id', ondelete="CASCADE"), nullable=False, index=True)
+    name = db.Column(db.String, nullable=False)
+    token_hash = db.Column(db.String(64), unique=True, nullable=False)
+    scopes = db.Column(db.String, nullable=False, default='')
+    key = db.Column(db.LargeBinary)
+    rating_cap = db.Column(db.String)
+    invitation = db.Column(db.String)
+    created = db.Column(db.String, nullable=False)
+    expires = db.Column(db.String)
+    last_used = db.Column(db.String)
+
+    account = db.relationship('LanternAccount', backref=db.backref('devices', passive_deletes=True))
+
+
+class LanternInvitation(db.Model):
+    __tablename__ = 'lantern_invitations'
+    id = db.Column(db.String, primary_key=True)
+    account_id = db.Column(db.Integer, db.ForeignKey('lantern_accounts.id', ondelete="CASCADE"), nullable=False, index=True)
+    code = db.Column(db.String, nullable=False)
+    code_key = db.Column(db.String, unique=True, nullable=False)
+    scopes = db.Column(db.String, nullable=False, default='')
+    expires = db.Column(db.String, nullable=False)
+    devices = db.Column(db.Integer, nullable=False)
+    used = db.Column(db.Integer, nullable=False, default=0)
+    rating_cap = db.Column(db.String)
+    note = db.Column(db.String)
+    created = db.Column(db.String, nullable=False)
+
+    account = db.relationship('LanternAccount', backref=db.backref('invitations', passive_deletes=True))
+
+
 class Task(db.Model):
     __tablename__ = 'tasks'
 
