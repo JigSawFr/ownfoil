@@ -40,6 +40,7 @@ def init():
     # Start UDP discovery for clients on the LAN
     discovery.reconcile()
     lantern_tls.reconcile(app)
+    lantern_service.reconcile_dnssd(app)
     lantern_service.start_watching(app)
 
     # init libraries
@@ -93,6 +94,7 @@ def on_settings_change():
             pool.scale(desired)
     discovery.reconcile()
     lantern_tls.reconcile(app)
+    lantern_service.reconcile_dnssd(app)
     if watcher is not None:
         # Reconcile off this thread: this callback runs inside the native observer's dispatch,
         # which holds the observer lock that schedule/unschedule also need.

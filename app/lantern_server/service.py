@@ -84,6 +84,7 @@ def build():
         platforms=['switch'],
         public=bool(shop['public']),
         secret=_vault.get('cursor'),
+        cors_origins=[o for o in settings['lantern']['cors_origins'] if isinstance(o, str)],
         grant_seed=_vault.get('grant', 32),  # signs the grants peers check; it never leaves this server
         spki=None if behind_proxy else own_key,
         scheme='https' if behind_proxy else None,
@@ -102,7 +103,7 @@ def current():
     shop = get_settings()['shop']
     settings = get_settings()
     key = (shop['name'], shop['motd'], bool(shop['public']), bool(settings['lantern']['proxy']),
-           settings['lantern']['https_port'])
+           settings['lantern']['https_port'], tuple(settings['lantern']['cors_origins']))
     with _lock:
         if _state['key'] != key:
             _state['lantern'], _state['key'] = build(), key
@@ -175,7 +176,51 @@ def start_watching(app):
 
 def stop_watching():
     global _watcher
+    stop_dnssd()
     with _lock:
         watcher, _watcher = _watcher, None
     if watcher is not None:
         watcher.stop()
+
+
+_zeroconf = {'handle': None, 'key': None}
+
+
+def reconcile_dnssd(app):
+    """Announce the TLS port on the local network (DNS-SD) while Lantern is on and serving it, and stop when not."""
+    from lantern.server.discovery import advertise_dnssd
+    from utils import get_lan_ip
+    from lantern_server import tls as listener
+    settings = get_settings()
+    port = listener._server.port if listener._server is not None else 0
+    address = get_lan_ip() if port else None
+    with _lock:
+        key = (settings['lantern']['dnssd'] and settings['lantern']['enabled'] and address and port,
+               settings['shop']['name'])
+        if key == _zeroconf['key']:
+            return
+        _stop_dnssd()
+        _zeroconf['key'] = key
+        if not key[0]:
+            return
+        try:
+            with app.app_context():
+                _zeroconf['handle'] = advertise_dnssd(current(), port, address)
+            logger.info(f'Lantern: announced on the local network, {address} port {port}.')
+        except Exception as e:  # no multicast, no zeroconf: the server still works, found by its address
+            logger.warning(f'Lantern: could not announce on the local network ({e}).')
+
+
+def _stop_dnssd():
+    handle, _zeroconf['handle'] = _zeroconf['handle'], None
+    if handle is not None:
+        try:
+            handle.close()
+        except Exception:
+            logger.exception('Lantern: could not stop announcing.')
+
+
+def stop_dnssd():
+    with _lock:
+        _stop_dnssd()
+        _zeroconf['key'] = None

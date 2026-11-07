@@ -109,6 +109,10 @@ DEFAULT_SETTINGS = {
         # Other places that serve the same files, which clients may read them from instead (Lantern 19.2):
         # the address of a copy of the library, whose files are found by the same path as here.
         "mirrors": [],
+        # Announce the TLS port on the local network (DNS-SD, `_lantern._tcp`), so that devices find the server.
+        "dnssd": True,
+        # Origins whose web pages may read this server from a browser ("https://app.example.org"), none by default.
+        "cors_origins": [],
         # Differential updates (Lantern 22): files of these types, of these sizes in bytes, are cut into chunks
         # when they are hashed, so that a device downloads only what changed. Off by default: cutting is slow.
         "deltas": {
